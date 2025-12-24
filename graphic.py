@@ -56,7 +56,9 @@ def read_file(list_tree, analyse_tree, text_area):
 def closeCallBack(win):
     set_state_stop()
     # ensure thread can be close
-    get_thread().join()
+    t = get_thread()
+    if t:
+        get_thread().join()
     if determine_close():
         win.destroy()
 
