@@ -14,7 +14,7 @@ from capture import is_Stop
 from capture import set_state_stop
 from capture import read_file_accordance_file_path
 from capture import set_filter
-from time import sleep
+from capture import get_thread
 
 def filter(filter):
     set_filter(filter)
@@ -24,7 +24,7 @@ def filter(filter):
 
 
 def save_file():
-    if not is_Stop("_"):
+    if not is_Stop():
         messagebox.showwarning(
             message = "Save file require you stop capture packet",
             title = "Save warn"
@@ -54,8 +54,9 @@ def read_file(list_tree, analyse_tree, text_area):
 
 
 def closeCallBack(win):
-    set_state_stop(True)
-    sleep(0.5)  # ensure user close fastest, if fastest will be happen a thread question
+    set_state_stop()
+    # ensure thread can be close
+    get_thread().join()
     if determine_close():
         win.destroy()
 

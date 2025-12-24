@@ -1,18 +1,19 @@
-import tkinter
 import scapy.all as scapy
 import threading
 from tkinter import DISABLED, NORMAL, constants
-from time import sleep
 
 state = {
     'interface_name' : 'wlp0s20f3',
     'first_time' : 0.0,
     'packet_number' : 0,
-    'is_Stop':False,
-    'is_Pause':False,
     'capture_packet_array':[],
-    'filter':""
+    'filter': "",
+    'capture_thread' : None
 }
+
+is_stop = threading.Event()
+is_pause = threading.Event()
+ 
 
 def TODO(txt):
     print(txt)
@@ -28,7 +29,7 @@ def get_choose_if_name(win, tv):
     win.destroy()
 
 def packet_handle(pkt, tree):
-    if state['is_Pause'] or state['is_Stop']: return
+    if is_pause.is_set() or is_stop.is_set(): return
 
     state['capture_packet_array'].append(pkt)
 
@@ -70,20 +71,17 @@ def packet_handle(pkt, tree):
 
 
 
-def is_Stop(_):
-    return state['is_Stop']
-
 def capture(tree):
     scapy.sniff(
         iface = state['interface_name'],
         prn = lambda pkt: packet_handle(pkt, tree),
-        stop_filter = is_Stop,
+        stop_filter = lambda _: is_stop.is_set(),
         filter = state['filter']
     )
 
 def start_capture(tree_list, btn_begin, btn_pause, btn_stop, hex_area, tree_analyse):
-    if not state['is_Pause']:
-        state['is_Stop'] = False
+    if not is_pause.is_set():
+        is_stop.clear()
         state['packet_number'] = 0
         state['capture_packet_array'].clear()
         state['first_time'] = 0
@@ -96,6 +94,7 @@ def start_capture(tree_list, btn_begin, btn_pause, btn_stop, hex_area, tree_anal
 
     t = threading.Thread(target=lambda: capture(tree_list), name = 'capture packet')
     t.start()
+    state['capture_thread'] = t
 
     btn_begin['state'] = DISABLED
     btn_pause['state'] = NORMAL
@@ -104,14 +103,14 @@ def start_capture(tree_list, btn_begin, btn_pause, btn_stop, hex_area, tree_anal
 def pause_capture(btn):
     if btn['text'] == 'pause':
         btn['text'] = 'reset'
-        state['is_Pause'] = True
+        is_pause.set()
     elif btn['text'] == 'reset':
         btn['text'] = 'pause'
-        state['is_Pause'] = False
+        is_pause.clear()
 
 def stop_capture(btn_begin, btn_pause, btn_stop):
-    state['is_Stop'] = True
-    state['is_Pause'] = False
+    is_stop.set()
+    is_pause.clear()
     btn_pause['text'] = 'pause'
     btn_begin['state'] = NORMAL
     btn_pause['state'] = DISABLED
@@ -140,27 +139,33 @@ def analyse_packet(event, list_tree, analyse_tree, hex_area):
     hex_area['state'] = DISABLED
 
 
-def set_state_stop(value):
-    state['is_Stop'] = value
+def set_state_stop():
+    is_stop.set()
 
 def save_file_accordance_file_path(file_path):
     scapy.wrpcap(file_path, state['capture_packet_array'])
 
 def read_file_accordance_file_path(file_path, tree):
     state['capture_packet_array'].clear()
-    state['is_Pause'] = False
-    state['is_Stop'] = False
+    is_pause.clear()
+    is_stop.clear()
     state['first_time'] = 0
     state['packet_number'] = 0
 
     scapy.sniff(
         prn = lambda pkt: packet_handle(pkt, tree),
-        stop_filter = is_Stop,
+        stop_filter = lambda _: is_stop.is_set(),
         offline = file_path,
         filter = state['filter']
     )
 
-    state['is_Stop'] = True
+    is_stop.set()
 
 def set_filter(filter):
     state['filter'] = filter
+
+def is_Stop():
+    return is_stop.is_set()
+
+def get_thread():
+    return state['capture_thread']
